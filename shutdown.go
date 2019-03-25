@@ -16,8 +16,9 @@ var DefaultShutdown = New()
 
 // Shutdown is an instance of shutdown handler.
 type Shutdown struct {
-	hooks map[string]func(os.Signal)
-	mutex *sync.Mutex
+	hooks  map[string]func(os.Signal)
+	mutex  *sync.Mutex
+	signal os.Signal
 }
 
 // New creates a new Shutdown instance.
@@ -61,6 +62,11 @@ func Hooks() map[string]func(os.Signal) {
 // It will wait for any signal if no signals provided.
 func Listen(signals ...os.Signal) {
 	DefaultShutdown.Listen(signals...)
+}
+
+// Now runs all shutdown hooks immediatly
+func Now() {
+	DefaultShutdown.Now()
 }
 
 // Remove cancels hook by identificator (key).
@@ -121,14 +127,23 @@ func (s *Shutdown) Hooks() map[string]func(os.Signal) {
 func (s *Shutdown) Listen(signals ...os.Signal) {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, signals...)
-	sig := <-ch
+	s.signal = <-ch
+	s.Now()
+}
+
+// Now runs all shutdown hooks immediatly
+func (s *Shutdown) Now() {
+	if s.signal == nil {
+		s.signal = os.Interrupt
+	}
+
 	var wg sync.WaitGroup
 	for _, fn := range s.Hooks() {
 		wg.Add(1)
 		go func(sig os.Signal, fn func(os.Signal)) {
 			defer wg.Done()
 			fn(sig)
-		}(sig, fn)
+		}(s.signal, fn)
 	}
 	wg.Wait()
 }
