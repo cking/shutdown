@@ -1,1 +1,3 @@
-module github.com/ztrue/shutdown
+module github.com/cking/shutdown
+
+go 1.12
